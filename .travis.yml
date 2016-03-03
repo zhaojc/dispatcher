@@ -1,0 +1,21 @@
+language: java
+
+sudo: required
+
+services:
+  - docker
+
+before_script:
+- mvn clean install
+
+script:
+- mvn test
+
+- >
+ if [ ! -z "$TRAVIS_TAG" ]; then
+    docker build -t simpleci/dispatcher:$TRAVIS_TAG .
+    docker login -e="$DOCKER_EMAIL" -u="$DOCKER_USERNAME" -p="$DOCKER_PASSWORD"
+    docker push simpleci/dispatcher:$TRAVIS_TAG
+  fi
+
+
