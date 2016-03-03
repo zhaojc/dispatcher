@@ -5,6 +5,8 @@ import net.jodah.lyra.config.Config;
 import net.jodah.lyra.config.RecoveryPolicy;
 import net.jodah.lyra.util.Duration;
 import org.apache.commons.dbcp2.BasicDataSource;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import simpleci.dispatcher.*;
 import simpleci.dispatcher.listener.JobToBuildLifecycleListener;
 import simpleci.dispatcher.JobsCreator;
@@ -20,29 +22,104 @@ import java.io.IOException;
 import java.util.concurrent.TimeoutException;
 
 public class Main {
+    private final static Logger logger = LoggerFactory.getLogger(Main.class);
+
     public static void main(String[] args) throws IOException, TimeoutException {
-        AppParameters parameters = AppParameters.fromEnv();
-        Connection connection = createConnection(parameters);
-        DataSource dataSource = createDataSource(parameters);
-        Repository repository = new Repository(dataSource);
-        UpdaterRepository updaterRepository = new UpdaterRepository(dataSource);
-        JobProducer jobProducer = new JobProducer(connection);
+        DiContainer container = new DiContainer();
 
-        JobsCreator jobsCreator = new JobsCreator(repository, jobProducer);
-        JobToBuildLifecycleListener jobToBuildListener = new JobToBuildLifecycleListener(repository, jobsCreator);
-        BuildLifecycleListener buildLifecycleListener = new BuildLifecycleListener(updaterRepository);
-        DbJobListener dbJobListener = new DbJobListener(updaterRepository);
-        CentrifugoApi centrifugoApi = new CentrifugoApi();
-        CentrifugoListener centrifugoJobLifecycleListener = new CentrifugoListener(repository, centrifugoApi);
-        EventDispatcher eventDispatcher = new EventDispatcher(
-                jobToBuildListener,
-                buildLifecycleListener,
-                dbJobListener,
-                centrifugoJobLifecycleListener);
+        initParameters(container);
+        waitForRabbitmq(container.get("parameters", AppParameters.class));
+        waitForDatabase(container.get("parameters", AppParameters.class));
+        waitForRedis(container.get("parameters", AppParameters.class));
+        initApp(container);
 
-        LogConsumer logConsumer = new LogConsumer(connection, eventDispatcher);
-        logConsumer.consume();
+        container.get("log_consumer", LogConsumer.class).consume();
 
+    }
+
+    private static void initApp(DiContainer container) {
+        try {
+            container.add("connection", createConnection(
+                    container.get("parameters", AppParameters.class)));
+
+            container.add("data_source", createDataSource(
+                    container.get("parameters", AppParameters.class)));
+
+            container.add("repository", new Repository(
+                    container.get("data_source", DataSource.class)));
+
+            container.add("repository.updater", new UpdaterRepository(
+                    container.get("data_source", DataSource.class)));
+
+            container.add("job.producer", new JobProducer(
+                    container.get("connection", Connection.class)));
+
+            container.add("job.creator", new JobsCreator(
+                    container.get("repository", Repository.class),
+                    container.get("job.producer", JobProducer.class)));
+
+            container.add("listener.job_to_build", new JobToBuildLifecycleListener(
+                    container.get("repository", Repository.class),
+                    container.get("job.creator", JobsCreator.class)));
+
+            container.add("listener.build", new BuildLifecycleListener(
+                    container.get("repository.updater", UpdaterRepository.class)));
+
+            container.add("listener.db_job", new DbJobListener(
+                    container.get("repository.updater", UpdaterRepository.class)));
+
+            container.add("centrifugo_api", new CentrifugoApi());
+
+            container.add("listener.centrifugo", new CentrifugoListener(
+                    container.get("repository", Repository.class),
+                    container.get("centrifugo_api", CentrifugoApi.class)));
+
+            container.add("event_dispatcher", new EventDispatcher(
+                    container.get("listener.job_to_build", JobToBuildLifecycleListener.class),
+                    container.get("listener.build", BuildLifecycleListener.class),
+                    container.get("listener.db_job", DbJobListener.class),
+                    container.get("listener.centrifugo", CentrifugoListener.class)));
+
+            container.add("log_consumer", new LogConsumer(
+                    container.get("connection", Connection.class),
+                    container.get("event_dispatcher", EventDispatcher.class)));
+
+        } catch (IOException | TimeoutException e) {
+            fail("Error create services", e);
+        }
+    }
+
+    private static void fail(String message, Exception e) {
+        logger.error(message, e);
+        System.exit(1);
+    }
+
+    private static void waitForRedis(AppParameters parameters) {
+        logger.info("Waiting for redis");
+        if (!Utils.waitForPort(parameters.redisHost, parameters.redisPort, 10, 1000)) {
+            logger.error("Failed connect to redis server");
+            System.exit(0);
+        }
+    }
+
+    private static void waitForDatabase(AppParameters parameters) {
+        logger.info("Waiting for database");
+        if (!Utils.waitForPort(parameters.databaseHost, parameters.databasePort, 10, 1000)) {
+            logger.error("Failed connect to database server");
+            System.exit(0);
+        }
+    }
+
+    private static void waitForRabbitmq(AppParameters parameters) {
+        logger.info("Waiting for rabbitmq");
+        if (!Utils.waitForPort(parameters.rabbitmqHost, parameters.rabbitmqPort, 10, 1000)) {
+            logger.error("Failed connect to rabbitmq server");
+            System.exit(0);
+        }
+    }
+
+    private static void initParameters(DiContainer container) {
+        container.add("parameters", AppParameters.fromEnv());
     }
 
     private static DataSource createDataSource(AppParameters parameters) {
