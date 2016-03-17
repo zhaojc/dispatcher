@@ -1,11 +1,7 @@
 package simpleci.dispatcher.listener.db;
 
 
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-import simpleci.dispatcher.repository.Repository;
-import simpleci.dispatcher.entity.JobStatus;
-import simpleci.dispatcher.message.BuildMessage;
+import simpleci.dispatcher.message.BuildRequestMessage;
 import simpleci.dispatcher.message.event.BuildStopEvent;
 import simpleci.dispatcher.repository.UpdaterRepository;
 
@@ -18,15 +14,15 @@ public class BuildLifecycleListener {
         this.repository = repository;
     }
 
-    public void buildStart(BuildMessage event)
+    public void buildStart(BuildRequestMessage event)
     {
         Date startedAt = new Date();
-        repository.buildStarted(event.buildId, JobStatus.RUNNING, startedAt);
+        repository.buildStarted(event.buildId, startedAt);
 
     }
 
     public void buildStop(BuildStopEvent event) {
         Date stoppedAt = new Date();
-        repository.buildStopped(event.buildId, JobStatus.RUNNING, stoppedAt);
+        repository.buildStopped(event.buildId, event.status, stoppedAt);
     }
 }

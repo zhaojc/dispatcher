@@ -6,8 +6,8 @@ import simpleci.dispatcher.entity.Build;
 import simpleci.dispatcher.entity.Job;
 import simpleci.dispatcher.entity.Project;
 import simpleci.dispatcher.message.JobOutputMessage;
-import simpleci.dispatcher.message.JobStartMessage;
-import simpleci.dispatcher.message.JobStopMessage;
+import simpleci.dispatcher.message.JobStartedMessage;
+import simpleci.dispatcher.message.JobStoppedMessage;
 
 import java.util.Map;
 
@@ -20,7 +20,7 @@ public class CentrifugoListener {
         this.api = api;
     }
 
-    public void jobStart(JobStartMessage message) {
+    public void jobStart(JobStartedMessage message) {
         Job job = repository.findJob(message.jobId);
         Build build = repository.findBuild(job.buildId);
         Project project = repository.findProject(build.projectId);
@@ -39,7 +39,7 @@ public class CentrifugoListener {
         api.send(message.output, jobChannelName(message.jobId));
     }
 
-    public void jobStop(JobStopMessage message) {
+    public void jobStop(JobStoppedMessage message) {
         Job job = repository.findJob(message.jobId);
         Build build = repository.findBuild(job.buildId);
         Project project = repository.findProject(build.projectId);
@@ -49,7 +49,7 @@ public class CentrifugoListener {
                 .put("build_id", build.id)
                 .put("job_id", job.id)
                 .put("action", "job_stop")
-                .put("ended_at", message.endedAt.getTime())
+                .put("ended_at", message.stoppedAt.getTime())
                 .put("job_status", message.jobStatus)
                 .build();
         api.send(sendMessage, projectChannelName(project.id));

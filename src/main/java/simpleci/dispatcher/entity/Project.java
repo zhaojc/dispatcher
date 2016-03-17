@@ -5,9 +5,4 @@ public class Project {
     public String privateKey;
     public String publicKey;
     public String repositoryUrl;
-
-    public String settingsCacheType;
-    public String settingsCacheSshHost;
-    public String settingsCacheSshUser;
-    public String settingsCacheSshDir;
 }

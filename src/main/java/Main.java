@@ -9,13 +9,19 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import simpleci.dispatcher.*;
 import simpleci.dispatcher.listener.JobToBuildLifecycleListener;
-import simpleci.dispatcher.JobsCreator;
+import simpleci.dispatcher.job.JobsCreator;
+import simpleci.dispatcher.listener.WorkerStateListener;
 import simpleci.dispatcher.listener.centrifugo.CentrifugoApi;
 import simpleci.dispatcher.listener.centrifugo.CentrifugoListener;
 import simpleci.dispatcher.listener.db.BuildLifecycleListener;
 import simpleci.dispatcher.listener.db.DbJobListener;
+import simpleci.dispatcher.message.WorkerInfoRequestMessage;
+import simpleci.dispatcher.queue.JobProducer;
+import simpleci.dispatcher.queue.LogConsumer;
+import simpleci.dispatcher.queue.ServiceMessageProducer;
 import simpleci.dispatcher.repository.Repository;
 import simpleci.dispatcher.repository.UpdaterRepository;
+import simpleci.dispatcher.settings.SettingsManager;
 
 import javax.sql.DataSource;
 import java.io.IOException;
@@ -33,8 +39,9 @@ public class Main {
         waitForRedis(container.get("parameters", AppParameters.class));
         initApp(container);
 
-        container.get("log_consumer", LogConsumer.class).consume();
+        container.get("worker.message_producer", ServiceMessageProducer.class).send(new WorkerInfoRequestMessage());
 
+        container.get("log_consumer", LogConsumer.class).consume();
     }
 
     private static void initApp(DiContainer container) {
@@ -51,16 +58,23 @@ public class Main {
             container.add("repository.updater", new UpdaterRepository(
                     container.get("data_source", DataSource.class)));
 
+            container.add("settings_manager", new SettingsManager(
+                    container.get("repository", Repository.class)));
+
             container.add("job.producer", new JobProducer(
                     container.get("connection", Connection.class)));
 
+            container.add("worker.message_producer", new ServiceMessageProducer(
+                    container.get("connection", Connection.class)));
+
             container.add("job.creator", new JobsCreator(
-                    container.get("repository", Repository.class),
-                    container.get("job.producer", JobProducer.class)));
+                    container.get("repository", Repository.class)));
 
             container.add("listener.job_to_build", new JobToBuildLifecycleListener(
                     container.get("repository", Repository.class),
-                    container.get("job.creator", JobsCreator.class)));
+                    container.get("settings_manager", SettingsManager.class),
+                    container.get("job.creator", JobsCreator.class),
+                    container.get("job.producer", JobProducer.class)));
 
             container.add("listener.build", new BuildLifecycleListener(
                     container.get("repository.updater", UpdaterRepository.class)));
@@ -74,11 +88,16 @@ public class Main {
                     container.get("repository", Repository.class),
                     container.get("centrifugo_api", CentrifugoApi.class)));
 
+            container.add("listener.workers", new WorkerStateListener(
+                    container.get("settings_manager", SettingsManager.class)));
+
             container.add("event_dispatcher", new EventDispatcher(
                     container.get("listener.job_to_build", JobToBuildLifecycleListener.class),
                     container.get("listener.build", BuildLifecycleListener.class),
                     container.get("listener.db_job", DbJobListener.class),
-                    container.get("listener.centrifugo", CentrifugoListener.class)));
+                    container.get("listener.centrifugo", CentrifugoListener.class),
+                    container.get("listener.workers", WorkerStateListener.class),
+                    container.get("worker.message_producer", ServiceMessageProducer.class)));
 
             container.add("log_consumer", new LogConsumer(
                     container.get("connection", Connection.class),

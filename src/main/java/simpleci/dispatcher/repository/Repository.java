@@ -5,6 +5,7 @@ import org.slf4j.LoggerFactory;
 import simpleci.dispatcher.entity.Build;
 import simpleci.dispatcher.entity.Job;
 import simpleci.dispatcher.entity.Project;
+import simpleci.dispatcher.entity.SettingsParameter;
 
 import javax.sql.DataSource;
 import java.sql.*;
@@ -94,7 +95,7 @@ public class Repository {
     }
 
     public Project findProject(long projectId) {
-        String query = "SELECT id, public_key, private_key, repository_url, settings_cache_type, settings_ssh_host, settings_ssh_user, settings_ssh_dir from project where id = ?";
+        String query = "SELECT id, public_key, private_key, repository_url from project where id = ?";
         try {
             try (Connection connection = dataSource.getConnection()) {
                 try (PreparedStatement statement = connection.prepareStatement(query)) {
@@ -107,10 +108,6 @@ public class Repository {
                             project.publicKey = resultSet.getString("public_key");
                             project.privateKey = resultSet.getString("private_key");
                             project.repositoryUrl = resultSet.getString("repository_url");
-                            project.settingsCacheSshDir = resultSet.getString("settings_ssh_dir");
-                            project.settingsCacheSshHost = resultSet.getString("settings_ssh_host");
-                            project.settingsCacheSshUser = resultSet.getString("settings_ssh_user");
-                            project.settingsCacheType = resultSet.getString("settings_cache_type");
                             return project;
                         }
                     }
@@ -165,6 +162,31 @@ public class Repository {
                             jobs.add(job);
                         }
                         return jobs;
+                    }
+                }
+            }
+        } catch (SQLException e) {
+            logger.error("", e);
+        }
+        return new ArrayList<>();
+    }
+
+    public List<SettingsParameter> getSettings() {
+        String query = "SELECT id, name, value from settings_parameter";
+        try {
+            try (Connection connection = dataSource.getConnection()) {
+                try (PreparedStatement statement = connection.prepareStatement(query)) {
+                    try (ResultSet resultSet = statement.executeQuery()) {
+                        List<SettingsParameter> parameters = new ArrayList<>();
+
+                        while (resultSet.next()) {
+                            SettingsParameter parameter = new SettingsParameter();
+                            parameter.id = resultSet.getLong("id");
+                            parameter.name = resultSet.getString("name");
+                            parameter.value = resultSet.getString("value");
+                            parameters.add(parameter);
+                        }
+                        return parameters;
                     }
                 }
             }

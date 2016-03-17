@@ -1,18 +1,15 @@
 package simpleci.dispatcher.message;
 
 
-import java.util.Map;
+import com.google.gson.JsonObject;
 
 public class JobOutputMessage {
-    public int jobId;
-    public String output;
+    public final int jobId;
+    public final String output;
 
-    public static JobOutputMessage fromJson(Map logMessage) {
-        JobOutputMessage output = new JobOutputMessage();
-        output.jobId  = new Double((double) logMessage.get("job_id")).intValue();
-        output.output = (String) logMessage.get("output");
-
-        return output;
+    public JobOutputMessage(JsonObject message) {
+        jobId  = message.get("job_id").getAsInt();
+        output = message.get("output").getAsString();
     }
 
 }

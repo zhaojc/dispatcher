@@ -69,6 +69,12 @@
             <type>jar</type>
         </dependency>
 
+        <dependency>
+            <groupId>com.google.apis</groupId>
+            <artifactId>google-api-services-compute</artifactId>
+            <version>v1-rev99-1.21.0</version>
+        </dependency>
+
 
     </dependencies>
 

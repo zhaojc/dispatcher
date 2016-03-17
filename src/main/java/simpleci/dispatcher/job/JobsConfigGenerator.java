@@ -1,4 +1,4 @@
-package simpleci.dispatcher;
+package simpleci.dispatcher.job;
 
 import com.google.common.collect.ImmutableSet;
 import com.google.gson.FieldNamingPolicy;
@@ -16,10 +16,6 @@ public class JobsConfigGenerator
 
     private static final String DEFAULT_SECTION = "build";
 
-    public List<Map> generateJobsConfig(Build build) {
-        return generateJobsConfig(build, DEFAULT_SECTION);
-    }
-
     public List<Map> generateJobsConfig(Build build, String section)
     {
         final Gson gson = new GsonBuilder().setFieldNamingPolicy(FieldNamingPolicy.LOWER_CASE_WITH_UNDERSCORES).create();
@@ -27,8 +23,8 @@ public class JobsConfigGenerator
         Map config = gson.fromJson(build.config, Map.class);
         if (!section.equals(DEFAULT_SECTION)) {
             if(!config.containsKey(section)) {
-                logger.error(String.format("Config does not contains section %s", section));
-                return null;
+                logger.info(String.format("Config for build %d does not contains section %s, skipping", build.id, section));
+                return new ArrayList<>();
             }
 
             config = (Map) config.get(section);
@@ -36,7 +32,7 @@ public class JobsConfigGenerator
 
         if(!config.containsKey("matrix")) {
             logger.error("Job section must contain a matrix");
-            return null;
+            return new ArrayList<>();
         }
 
         List matrix = (List) config.get("matrix");
