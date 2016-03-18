@@ -34,10 +34,13 @@ public class Main {
         DiContainer container = new DiContainer();
 
         initParameters(container);
+        logger.info("Started dispatcher: " + container.get("parameters", AppParameters.class).toString());
+
         waitForRabbitmq(container.get("parameters", AppParameters.class));
         waitForDatabase(container.get("parameters", AppParameters.class));
         waitForRedis(container.get("parameters", AppParameters.class));
         initApp(container);
+
 
         container.get("worker.message_producer", ServiceMessageProducer.class).send(new WorkerInfoRequestMessage());
 

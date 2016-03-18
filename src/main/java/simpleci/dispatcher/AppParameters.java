@@ -1,11 +1,12 @@
 package simpleci.dispatcher;
 
+import com.google.common.base.MoreObjects;
+
 import java.io.IOException;
 import java.io.InputStream;
 import java.util.Scanner;
 
-public class AppParameters
-{
+public class AppParameters {
     public String rabbitmqHost;
     public int rabbitmqPort;
     public String rabbitmqUser;
@@ -42,7 +43,7 @@ public class AppParameters
 
     private static int getEnv(String name, int defaultValue) {
         String envValue = System.getenv(name);
-        if(envValue != null) {
+        if (envValue != null) {
             return Integer.parseInt(envValue);
         }
         return defaultValue;
@@ -50,10 +51,28 @@ public class AppParameters
 
     private static String getEnv(String name, String defaultValue) {
         String envValue = System.getenv(name);
-        if(envValue != null) {
+        if (envValue != null) {
             return envValue;
         }
         return defaultValue;
     }
 
- }
+    @Override
+    public String toString() {
+        return MoreObjects
+                .toStringHelper(getClass())
+                .add("redis_host", redisHost)
+                .add("redis_port", redisPort)
+                .add("database_host", databaseHost)
+                .add("database_port", databasePort)
+                .add("database_user", databaselUser)
+                .add("database_password", databasePassword)
+                .add("database_name", databaseName)
+                .add("rabbitmq_host", rabbitmqHost)
+                .add("rabbitmq_port", rabbitmqHost)
+                .add("rabbitmq_user", rabbitmqUser)
+                .add("rabbitmq_password", rabbitmqPassword)
+                .toString();
+    }
+
+}
