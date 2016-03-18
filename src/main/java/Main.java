@@ -7,6 +7,8 @@ import net.jodah.lyra.util.Duration;
 import org.apache.commons.dbcp2.BasicDataSource;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import redis.clients.jedis.Jedis;
+import redis.clients.jedis.exceptions.JedisConnectionException;
 import simpleci.dispatcher.*;
 import simpleci.dispatcher.listener.JobToBuildLifecycleListener;
 import simpleci.dispatcher.job.JobsCreator;
@@ -25,6 +27,7 @@ import simpleci.dispatcher.settings.SettingsManager;
 
 import javax.sql.DataSource;
 import java.io.IOException;
+import java.sql.SQLException;
 import java.util.concurrent.TimeoutException;
 
 public class Main {
@@ -34,22 +37,28 @@ public class Main {
         DiContainer container = new DiContainer();
 
         initParameters(container);
-        logger.info("Started dispatcher: " + container.get("parameters", AppParameters.class).toString());
+        AppParameters parameters = container.get("parameters", AppParameters.class);
+        logger.info("Started dispatcher: " + parameters.toString());
 
-        waitForRabbitmq(container.get("parameters", AppParameters.class));
-        waitForDatabase(container.get("parameters", AppParameters.class));
-        waitForRedis(container.get("parameters", AppParameters.class));
+        if(!waitForRabbitmq(parameters)) {
+            System.exit(1);
+        }
+
+        if(!waitForDatabase(parameters)) {
+            System.exit(1);
+        }
+        if(!waitForRedis(parameters)) {
+            System.exit(1);
+        }
+
         initApp(container);
-
-
         container.get("worker.message_producer", ServiceMessageProducer.class).send(new WorkerInfoRequestMessage());
-
         container.get("log_consumer", LogConsumer.class).consume();
     }
 
     private static void initApp(DiContainer container) {
         try {
-            container.add("connection", createConnection(
+            container.add("connection", createRabbitmqConnection(
                     container.get("parameters", AppParameters.class)));
 
             container.add("data_source", createDataSource(
@@ -118,28 +127,77 @@ public class Main {
         System.exit(1);
     }
 
-    private static void waitForRedis(AppParameters parameters) {
+    private static boolean waitForRedis(AppParameters parameters) {
         logger.info("Waiting for redis");
-        if (!Utils.waitForPort(parameters.redisHost, parameters.redisPort, 10, 1000)) {
-            logger.error("Failed connect to redis server");
-            System.exit(0);
+        for(int i = 1; i <= 10; i++) {
+            logger.info(String.format("redis %d: connecting to %s:%s",
+                    i, parameters.redisHost, parameters.redisPort));
+            try {
+                Jedis connection = new Jedis(parameters.redisHost, parameters.redisPort);
+                connection.connect();
+                connection.close();
+                logger.info("Connection to redis established successfully");
+                return true;
+            } catch(JedisConnectionException e) {
+                logger.info("Failed to connect: " + e.getMessage());
+                try {
+                    Thread.sleep(1000);
+                } catch (InterruptedException e1) {
+                    logger.error("", e);
+                }
+            }
         }
+        logger.info(String.format("Failed connect to redis on %s:%d",
+                parameters.redisHost, parameters.rabbitmqPort));
+        return false;
     }
 
-    private static void waitForDatabase(AppParameters parameters) {
+    private static boolean waitForDatabase(AppParameters parameters) {
         logger.info("Waiting for database");
-        if (!Utils.waitForPort(parameters.databaseHost, parameters.databasePort, 10, 1000)) {
-            logger.error("Failed connect to database server");
-            System.exit(0);
+        for(int i = 1; i <= 10; i++) {
+            try {
+                logger.info(String.format("database %d: connecting to %s:%d",
+                        i, parameters.databaseHost, parameters.databasePort));
+                java.sql.Connection connection = createDataSource(parameters).getConnection();
+                connection.close();
+                logger.info("Connection to database established successfully");
+                return true;
+            } catch (SQLException e) {
+                logger.info("Failed to connect: " + e.getMessage());
+                try {
+                    Thread.sleep(1000);
+                } catch (InterruptedException e1) {
+                    logger.error("", e);
+                }
+            }
         }
+        logger.info(String.format("Failed connect to database on %s:%d",
+                parameters.databaseHost, parameters.databasePort));
+        return false;
     }
 
-    private static void waitForRabbitmq(AppParameters parameters) {
+    private static boolean waitForRabbitmq(AppParameters parameters) {
         logger.info("Waiting for rabbitmq");
-        if (!Utils.waitForPort(parameters.rabbitmqHost, parameters.rabbitmqPort, 10, 1000)) {
-            logger.error("Failed connect to rabbitmq server");
-            System.exit(0);
+        for(int i = 1; i <= 10; i++) {
+            try {
+                logger.info(String.format("rabbitmq %d: connecting to %s:%s",
+                        i, parameters.rabbitmqHost, parameters.rabbitmqPort));
+                Connection connection = createRabbitmqConnection(parameters);
+                connection.close();
+                logger.info("Connection to rabbitmq established successfully");
+                return true;
+            } catch (IOException | TimeoutException e) {
+                logger.info("Failed to connect: " + e.getMessage());
+                try {
+                    Thread.sleep(1000);
+                } catch (InterruptedException e1) {
+                    logger.error("", e);
+                }
+            }
         }
+        logger.info(String.format("Failed connect to rabbitmq on %s:%d",
+                parameters.rabbitmqHost, parameters.rabbitmqPort));
+        return false;
     }
 
     private static void initParameters(DiContainer container) {
@@ -158,7 +216,7 @@ public class Main {
         return bds;
     }
 
-    private static Connection createConnection(AppParameters parameters) throws IOException, TimeoutException {
+    private static Connection createRabbitmqConnection(AppParameters parameters) throws IOException, TimeoutException {
         Config config = new Config()
                 .withRecoveryPolicy(new RecoveryPolicy()
                         .withBackoff(Duration.seconds(1), Duration.seconds(30))
