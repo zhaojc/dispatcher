@@ -149,7 +149,7 @@ public class Main {
         BasicDataSource bds = new BasicDataSource();
 
         bds.setDriverClassName("com.mysql.jdbc.Driver");
-        bds.setUrl(String.format("jdbc:mysql://localhost:%d/%s", parameters.databasePort, parameters.databaseName));
+        bds.setUrl(String.format("jdbc:mysql://%s:%d/%s", parameters.databaseHost, parameters.databasePort, parameters.databaseName));
         bds.setUsername(parameters.databaselUser);
         bds.setPassword(parameters.databasePassword);
         bds.setInitialSize(5);
