@@ -11,6 +11,7 @@ import com.google.api.services.compute.model.*;
 import com.google.common.collect.ImmutableList;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import simpleci.dispatcher.AppParameters;
 import simpleci.dispatcher.settings.Settings;
 
 import java.io.ByteArrayInputStream;
@@ -24,10 +25,12 @@ import java.util.*;
 public class GceApi {
     private final static Logger logger = LoggerFactory.getLogger(GceApi.class);
     private static final String APPLICATION_NAME = "simpleci-dispatcher";
+    private final AppParameters parameters;
     private final Settings settings;
 
-    public GceApi(Settings settings) {
+    public GceApi(Settings settings, AppParameters parameters) {
         this.settings = settings;
+        this.parameters = parameters;
     }
 
 
@@ -98,10 +101,10 @@ public class GceApi {
         return "#!/bin/bash\n" +
                 "docker run " +
                 "-e HOSTNAME=$(hostname) " +
-                String.format("-e RABBITMQ_HOST=%s ", settings.gceRabbitmqHost) +
-                String.format("-e RABBITMQ_PORT=%d ", settings.gceRabbitmqPort) +
-                String.format("-e RABBITMQ_USER=%s ", settings.gceRabbitmqUser) +
-                String.format("-e RABBITMQ_PASSWORD=%s ", settings.gceRabbitmqPassword) +
+                String.format("-e RABBITMQ_HOST=%s ", parameters.rabbitmqHost) +
+                String.format("-e RABBITMQ_PORT=%d ", parameters.rabbitmqPort) +
+                String.format("-e RABBITMQ_USER=%s ", parameters.rabbitmqUser) +
+                String.format("-e RABBITMQ_PASSWORD=%s ", parameters.rabbitmqPassword) +
                 "-e EXIT_IF_INACTIVE=true " +
                 String.format("-e MINIMUM_RUNNING_TIME=%d ", minRunningTime) +
                 String.format("-e TIME_GRANULARITY=%d ", granulatiry) +

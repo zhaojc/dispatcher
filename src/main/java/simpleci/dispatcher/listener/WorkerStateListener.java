@@ -2,6 +2,7 @@ package simpleci.dispatcher.listener;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import simpleci.dispatcher.AppParameters;
 import simpleci.dispatcher.entity.Job;
 import simpleci.dispatcher.message.*;
 import simpleci.dispatcher.settings.Settings;
@@ -12,8 +13,10 @@ import java.util.*;
 public class WorkerStateListener {
     private final static Logger logger = LoggerFactory.getLogger(WorkerStateListener.class);
     private final SettingsManager settingsManager;
+    private final AppParameters parameters;
 
-    public WorkerStateListener(SettingsManager settingsManager) {
+    public WorkerStateListener(AppParameters parameters, SettingsManager settingsManager) {
+        this.parameters = parameters;
         this.settingsManager = settingsManager;
     }
 
@@ -67,7 +70,7 @@ public class WorkerStateListener {
     private void createInstances(final long buildId, int instanceCount, Settings settings) {
         logger.info(String.format("Will create %d instances on gce", instanceCount));
 
-        final GceApi gceApi = new GceApi(settings);
+        final GceApi gceApi = new GceApi(settings, parameters);
         List<Thread> createINstaceThreads = new ArrayList<>();
         for (int i = 0; i < instanceCount; i++) {
             Thread thread = new Thread(new Runnable() {
@@ -99,7 +102,7 @@ public class WorkerStateListener {
         Settings settings = settingsManager.loadSettings();
 
         if (message.workerType.equals("gce")) {
-            final GceApi gce = new GceApi(settings);
+            final GceApi gce = new GceApi(settings, parameters);
             Thread stopThread = new Thread(new Runnable() {
                 @Override
                 public void run() {

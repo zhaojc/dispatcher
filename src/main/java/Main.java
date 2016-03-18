@@ -89,6 +89,7 @@ public class Main {
                     container.get("centrifugo_api", CentrifugoApi.class)));
 
             container.add("listener.workers", new WorkerStateListener(
+                    container.get("parameters", AppParameters.class),
                     container.get("settings_manager", SettingsManager.class)));
 
             container.add("event_dispatcher", new EventDispatcher(

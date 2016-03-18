@@ -40,16 +40,4 @@ public class Settings {
 
     @Parameter(name = "gce.machine_type")
     public String gceMachineType;
-
-    @Parameter(name = "gce.rabbitmq_host")
-    public String gceRabbitmqHost;
-
-    @Parameter(name = "gce.rabbitmq_port")
-    public int gceRabbitmqPort;
-
-    @Parameter(name = "gce.rabbitmq_user")
-    public String gceRabbitmqUser = "guest";
-
-    @Parameter(name = "gce.rabbitmq_password")
-    public String gceRabbitmqPassword = "guest";
 }
