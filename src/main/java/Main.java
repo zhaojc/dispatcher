@@ -85,7 +85,8 @@ public class Main {
             container.add("listener.db_job", new DbJobListener(
                     container.get("repository.updater", UpdaterRepository.class)));
 
-            container.add("centrifugo_api", new CentrifugoApi());
+            container.add("centrifugo_api", new CentrifugoApi(
+                    container.get("parameters", AppParameters.class)));
 
             container.add("listener.centrifugo", new CentrifugoListener(
                     container.get("repository", Repository.class),

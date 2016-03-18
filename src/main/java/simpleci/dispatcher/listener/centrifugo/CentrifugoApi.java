@@ -4,14 +4,15 @@ import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 import com.google.gson.Gson;
 import redis.clients.jedis.Jedis;
+import simpleci.dispatcher.AppParameters;
 
 import java.util.Map;
 
 public class CentrifugoApi {
     private final Jedis jedis;
 
-    public CentrifugoApi() {
-        this.jedis = new Jedis("localhost");
+    public CentrifugoApi(AppParameters parameters) {
+        this.jedis = new Jedis(parameters.redisHost, parameters.redisPort);
     }
 
     public void send(Object message, String channel) {
