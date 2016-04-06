@@ -20,10 +20,10 @@ public class JobsCreator {
         this.repository = repository;
     }
 
-    public List<Tuple<Job, Map>> createJobs(Build build, String stage) {
+    public List<Tuple<Job, Map>> createJobs(Build build, Map config, String stage) {
         final Gson gson = new GsonBuilder().setFieldNamingPolicy(FieldNamingPolicy.LOWER_CASE_WITH_UNDERSCORES).create();
 
-        List<Map> jobsConfig = new JobsConfigGenerator().generateJobsConfig(build, stage);
+        List<Map> jobsConfig = new JobsConfigGenerator().generateJobsConfig(build, config, stage);
 
         List<Tuple<Job, Map>> jobs = new ArrayList<>();
         for (Map jobConfig : jobsConfig) {

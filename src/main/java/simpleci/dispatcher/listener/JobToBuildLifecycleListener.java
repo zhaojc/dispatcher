@@ -2,6 +2,9 @@ package simpleci.dispatcher.listener;
 
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableSet;
+import com.google.gson.FieldNamingPolicy;
+import com.google.gson.Gson;
+import com.google.gson.GsonBuilder;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import simpleci.dispatcher.EventDispatcher;
@@ -18,22 +21,16 @@ import simpleci.dispatcher.message.JobStoppedMessage;
 import simpleci.dispatcher.message.event.BuildStopEvent;
 import simpleci.dispatcher.settings.SettingsManager;
 
-import java.util.ArrayList;
-import java.util.List;
-import java.util.Map;
-import java.util.Set;
+import java.util.*;
 
 public class JobToBuildLifecycleListener {
     private final static Logger logger = LoggerFactory.getLogger(JobToBuildLifecycleListener.class);
     private final SettingsManager settingsManager;
 
-    private Map<String, String> JOB_TRANSITIONS = new ImmutableMap.Builder<String, String>()
-            .put("build", "deploy")
-            .build();
-
     private final Repository repository;
     private final JobsCreator jobsCreator;
     private final JobProducer jobProducer;
+    private final Gson gson;
     private EventDispatcher eventDispatcher;
 
     public JobToBuildLifecycleListener(
@@ -45,6 +42,7 @@ public class JobToBuildLifecycleListener {
         this.settingsManager = settingsManager;
         this.jobsCreator = jobsCreator;
         this.jobProducer = jobProducer;
+        this.gson = new GsonBuilder().setFieldNamingPolicy(FieldNamingPolicy.LOWER_CASE_WITH_UNDERSCORES).create();
     }
 
     public void setEventDispatcher(EventDispatcher eventDispatcher) {
@@ -52,14 +50,39 @@ public class JobToBuildLifecycleListener {
     }
 
     public void buildStart(BuildRequestMessage message) {
-        createBuildJobs(message.buildId, "build");
-    }
+        final long buildId = message.buildId;
 
-    private List<Job> createBuildJobs(long buildId, String stage) {
         Build build = repository.findBuild(buildId);
         Project project = repository.findProject(build.projectId);
 
-        List<Tuple<Job, Map>> jobs = jobsCreator.createJobs(build, stage);
+        Map config = gson.fromJson(build.config, Map.class);
+        if(!config.containsKey("stages")) {
+            logger.error("Build config does not contains stages section");
+            return;
+        }
+        List<String> stages = (List<String>) config.get("stages");
+        if(stages.size() == 0) {
+            logger.error("It must be at least one stage");
+            return;
+        }
+
+        createBuildJobs(build, project, config, stages.get(0));
+    }
+
+    private Map<String, String> createStageTransitions(List<String> stages) {
+        Map<String, String> transitions = new HashMap<>();
+        if(stages.size() <= 1) {
+            return transitions;
+        }
+
+        for(int i = 0; i < stages.size() - 1; i++) {
+            transitions.put(stages.get(i), stages.get(i + 1));
+        }
+        return transitions;
+    }
+
+    private List<Job> createBuildJobs(Build build, Project project, Map config, String stage) {
+        List<Tuple<Job, Map>> jobs = jobsCreator.createJobs(build, config, stage);
         for (Tuple<Job, Map> job : jobs) {
             repository.insertJob(job.x);
             jobProducer.newJob(project, build, job.x, job.y, settingsManager.loadSettings());
@@ -79,14 +102,20 @@ public class JobToBuildLifecycleListener {
     public void jobStop(JobStoppedMessage message) {
         Job job = repository.findJob(message.jobId);
         Build build = repository.findBuild(job.buildId);
+        Project project = repository.findProject(build.projectId);
+
         List<Job> jobs = repository.buildJobs(build.id);
 
         if (allJobsAreFinished(jobs)) {
             String buildStatus = buildStatus(jobs);
             if (buildStatus.equals(JobStatus.FINISHED_SUCCESS)) {
-                if (JOB_TRANSITIONS.containsKey(job.stage)) {
-                    String nextStage = JOB_TRANSITIONS.get(job.stage);
-                    List<Job> createdJobs = createBuildJobs(build.id, nextStage);
+                Map config = gson.fromJson(build.config, Map.class);
+                List<String> stages = (List<String>) config.get("stages");
+                Map<String, String> stageTransitions = createStageTransitions(stages);
+
+                if (stageTransitions.containsKey(job.stage)) {
+                    String nextStage = stageTransitions.get(job.stage);
+                    List<Job> createdJobs = createBuildJobs(build, project, config, nextStage);
 
                     if (!createdJobs.isEmpty()) {
                         // Do nothing - new jobs created
