@@ -100,7 +100,7 @@ public class GceApi {
         final int granulatiry = 60;
         return "#!/bin/bash\n" +
                 "docker run " +
-                "-e HOSTNAME=$(hostname) " +
+                "-h $(hostname) " +
                 String.format("-e RABBITMQ_HOST=%s ", parameters.rabbitmqHost) +
                 String.format("-e RABBITMQ_PORT=%d ", parameters.rabbitmqPort) +
                 String.format("-e RABBITMQ_USER=%s ", parameters.rabbitmqUser) +
