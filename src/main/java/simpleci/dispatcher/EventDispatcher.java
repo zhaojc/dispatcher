@@ -15,8 +15,7 @@ import simpleci.dispatcher.queue.ServiceMessageProducer;
 import java.util.Date;
 import java.util.List;
 
-public class EventDispatcher
-{
+public class EventDispatcher {
     private final static Logger logger = LoggerFactory.getLogger(EventDispatcher.class);
 
     private final JobToBuildLifecycleListener jobToBuildLifecycleListener;
@@ -77,12 +76,16 @@ public class EventDispatcher
     }
 
     public void onWorkerStart(WorkerStartedMessage message) {
-        logger.info(String.format("Started worker %s at %s", message.workerId, message.startedAt.toString()));
+        logger.info(String.format("Started worker: {type: %s, workerId: %s, hostname: %s, startedAt: %s}",
+                message.workerType, message.workerId,
+                message.workerHostName, message.startedAt.toString()));
         workerStateListener.workerStart(message);
     }
 
     public void onWorkerStop(WorkerStoppedMessage message) {
-        logger.info(String.format("Started worker %s at %s", message.workerId, message.stoppedAt.toString()));
+        logger.info(String.format("Stopping worker: {type: %s, workerId: %s, hostName: %s, executedTime: %d, stoppedAt: %s}",
+                message.workerType, message.workerId, message.workerHostName,
+                message.executedTime, message.stoppedAt.toString()));
         workerStateListener.workerStop(message);
     }
 
@@ -91,7 +94,8 @@ public class EventDispatcher
     }
 
     public void onWorkerInfo(WorkerInfoResponseMessage message) {
-        logger.info(String.format("Worker info: id %s, type %s, jobs %s", message.workerId, message.workerType, message.jobs));
+        logger.info(String.format("Worker info: {id: %s, type: %s, jobs: %s}",
+                message.workerId, message.workerType, message.jobs));
         workerStateListener.workerInfo(message);
     }
 
